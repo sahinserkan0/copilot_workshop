@@ -18,7 +18,8 @@ from utils import (
 st.set_page_config(
     page_title="RFP Document Manager",
     page_icon="📄",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # Initialize session state
@@ -27,6 +28,9 @@ if "chat_history" not in st.session_state:
 
 if "documents" not in st.session_state:
     st.session_state.documents = load_documents()
+
+if "processed_files" not in st.session_state:
+    st.session_state.processed_files = set()
 
 # Title
 st.title("📄 RFP Document Manager")
@@ -46,29 +50,39 @@ with st.sidebar:
     
     # Process uploaded file
     if uploaded_file is not None:
-        try:
-            # Read the file content
-            text_content = uploaded_file.read().decode("utf-8")
-            
-            # Extract RFP information using OpenAI
-            with st.spinner("Extracting RFP information..."):
-                client = get_client()
-                rfp_doc = extract_rfp_info(text_content, client)
+        # Create a unique identifier for the file
+        file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+        
+        # Only process if not already processed
+        if file_id not in st.session_state.processed_files:
+            try:
+                # Read the file content
+                text_content = uploaded_file.read().decode("utf-8")
                 
-                # Assign ID
-                rfp_doc.id = get_next_id(st.session_state.documents)
+                # Extract RFP information using OpenAI
+                with st.spinner("Extracting RFP information..."):
+                    client = get_client()
+                    rfp_doc = extract_rfp_info(text_content, client)
+                    
+                    # Assign ID
+                    rfp_doc.id = get_next_id(st.session_state.documents)
+                    
+                    # Add to documents list
+                    st.session_state.documents.append(rfp_doc)
+                    
+                    # Save to file
+                    save_documents(st.session_state.documents)
+                    
+                    # Mark file as processed
+                    st.session_state.processed_files.add(file_id)
+                    
+                st.success(f"✅ Successfully extracted and saved: {rfp_doc.title}")
+                st.rerun()
                 
-                # Add to documents list
-                st.session_state.documents.append(rfp_doc)
-                
-                # Save to file
-                save_documents(st.session_state.documents)
-                
-            st.success(f"✅ Successfully extracted and saved: {rfp_doc.title}")
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"❌ Error processing file: {str(e)}")
+            except Exception as e:
+                st.error(f"❌ Error processing file: {str(e)}")
+        else:
+            st.info(f"📄 File '{uploaded_file.name}' already processed.")
     
     st.markdown("---")
     
@@ -81,6 +95,7 @@ with st.sidebar:
     
     if st.button("🗑️ Clear Documents", use_container_width=True):
         st.session_state.documents = []
+        st.session_state.processed_files = set()
         # Delete the JSON file if it exists
         if os.path.exists(STORAGE_FILE):
             os.remove(STORAGE_FILE)

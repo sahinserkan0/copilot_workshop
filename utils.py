@@ -169,8 +169,9 @@ Extract the following fields from the provided text:
 If any field is not found in the text, leave it as null. Extract information accurately."""
 
     # Call OpenAI with structured output
+    model_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_MODEL", "gpt-4")
     completion = client.beta.chat.completions.parse(
-        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4"),
+        model=model_name,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
@@ -267,8 +268,9 @@ Answer questions accurately based on the document information provided."""
     full_messages = [system_message] + messages
     
     # Get completion with tool calling enabled
+    model_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_MODEL", "gpt-4")
     response = client.chat.completions.create(
-        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4"),
+        model=model_name,
         messages=full_messages,
         tools=get_tool_definitions(),
         tool_choice="auto"
