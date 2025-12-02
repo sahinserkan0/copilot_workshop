@@ -41,48 +41,56 @@ with st.sidebar:
     st.header("Document Management")
     
     # Upload RFP
-    st.subheader("Upload RFP")
-    uploaded_file = st.file_uploader(
-        "Upload a .txt file containing RFP information",
+    st.subheader("Upload RFP Documents")
+    uploaded_files = st.file_uploader(
+        "Upload one or more .txt files containing RFP information",
         type=["txt"],
-        help="Upload a text file with RFP details"
+        help="Upload text files with RFP details",
+        accept_multiple_files=True
     )
     
-    # Process uploaded file
-    if uploaded_file is not None:
-        # Create a unique identifier for the file
-        file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+    # Process uploaded files
+    if uploaded_files:
+        files_to_process = []
         
-        # Only process if not already processed
-        if file_id not in st.session_state.processed_files:
+        # Check which files haven't been processed yet
+        for uploaded_file in uploaded_files:
+            file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+            if file_id not in st.session_state.processed_files:
+                files_to_process.append((uploaded_file, file_id))
+        
+        # Process new files
+        if files_to_process:
             try:
-                # Read the file content
-                text_content = uploaded_file.read().decode("utf-8")
+                client = get_client()
                 
-                # Extract RFP information using OpenAI
-                with st.spinner("Extracting RFP information..."):
-                    client = get_client()
-                    rfp_doc = extract_rfp_info(text_content, client)
+                for uploaded_file, file_id in files_to_process:
+                    # Read the file content
+                    text_content = uploaded_file.read().decode("utf-8")
                     
-                    # Assign ID
-                    rfp_doc.id = get_next_id(st.session_state.documents)
+                    # Extract RFP information using OpenAI
+                    with st.spinner(f"Extracting RFP information from '{uploaded_file.name}'..."):
+                        rfp_doc = extract_rfp_info(text_content, client)
+                        
+                        # Assign ID
+                        rfp_doc.id = get_next_id(st.session_state.documents)
+                        
+                        # Add to documents list
+                        st.session_state.documents.append(rfp_doc)
+                        
+                        # Mark file as processed
+                        st.session_state.processed_files.add(file_id)
                     
-                    # Add to documents list
-                    st.session_state.documents.append(rfp_doc)
-                    
-                    # Save to file
-                    save_documents(st.session_state.documents)
-                    
-                    # Mark file as processed
-                    st.session_state.processed_files.add(file_id)
-                    
-                st.success(f"✅ Successfully extracted and saved: {rfp_doc.title}")
+                    st.success(f"✅ Successfully extracted and saved: {rfp_doc.title}")
+                
+                # Save all documents to file
+                save_documents(st.session_state.documents)
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Error processing file: {str(e)}")
         else:
-            st.info(f"📄 File '{uploaded_file.name}' already processed.")
+            st.info("📄 All selected files have already been processed.")
     
     st.markdown("---")
     
